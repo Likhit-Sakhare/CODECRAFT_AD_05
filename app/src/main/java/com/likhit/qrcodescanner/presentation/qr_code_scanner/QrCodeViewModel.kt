@@ -10,11 +10,11 @@ import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 
 @HiltViewModel
-class QrCodeViewModel @Inject constructor(): ViewModel() {
+class QrCodeViewModel @Inject constructor() : ViewModel() {
     private val _qrCodeUIState = MutableStateFlow(QrCodeUIState())
     val qrcodeUIState = _qrCodeUIState.asStateFlow()
 
-    fun onQrCodeDetected(result: String){
+    fun onQrCodeDetected(result: String) {
         Log.d("QRScanner", result)
         _qrCodeUIState.update {
             it.copy(
@@ -23,10 +23,18 @@ class QrCodeViewModel @Inject constructor(): ViewModel() {
         }
     }
 
-    fun onTargetPositioned(rect: Rect){
+    fun onTargetPositioned(rect: Rect) {
         _qrCodeUIState.update {
             it.copy(
                 targetRect = rect
+            )
+        }
+    }
+
+    fun onToggleFlash(){
+        _qrCodeUIState.update {
+            it.copy(
+                flashEnabled = !it.flashEnabled
             )
         }
     }

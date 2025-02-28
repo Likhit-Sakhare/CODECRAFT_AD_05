@@ -5,7 +5,8 @@ package com.likhit.qrcodescanner.presentation.qr_code_scanner
 import android.Manifest
 import android.content.Intent
 import android.net.Uri
-import androidx.camera.core.*
+import android.util.Log
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
@@ -20,7 +21,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FlashOff
+import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,7 +47,6 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toAndroidRect
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
@@ -106,11 +112,17 @@ fun QrCodeScreenRoot(
             qrCodeUIState.targetRect
         }
     }
-    LaunchedEffect(targetRect) {
+
+    LaunchedEffect(qrCodeUIState.lensFacing) {
         imageAnalysis.setAnalyzer(
             Dispatchers.Default.asExecutor(),
             QrCodeAnalyzer(
-                targetRect = targetRect.toAndroidRect(),
+                targetRect = android.graphics.Rect(
+                    targetRect.left.toInt(),
+                    targetRect.top.toInt(),
+                    targetRect.right.toInt(),
+                    targetRect.bottom.toInt()
+                ),
                 previewView = previewView,
                 onQrCodeScanned = { result ->
                     viewModel.onQrCodeDetected(result)
@@ -135,7 +147,11 @@ fun QrCodeScreenRoot(
             preview,
             imageAnalysis
         )
-        preview.setSurfaceProvider(previewView.surfaceProvider)
+        preview.surfaceProvider = previewView.surfaceProvider
+    }
+
+    LaunchedEffect(qrCodeUIState.flashEnabled) {
+        camera?.cameraControl?.enableTorch(qrCodeUIState.flashEnabled)
     }
 
     CameraPermission(
@@ -151,7 +167,8 @@ fun QrCodeScreenRoot(
                     modifier = modifier.padding(paddingValues),
                     qrCodeUIState = qrCodeUIState,
                     previewView = previewView,
-                    onTargetPositioned = viewModel::onTargetPositioned
+                    onTargetPositioned = viewModel::onTargetPositioned,
+                    onToggleFlash = viewModel::onToggleFlash
                 )
             }
         }
@@ -164,6 +181,7 @@ fun QrCodeScreen(
     previewView: PreviewView,
     qrCodeUIState: QrCodeUIState,
     onTargetPositioned: (Rect) -> Unit,
+    onToggleFlash: () -> Unit,
 ) {
     val context = LocalContext.current
     Box(
@@ -222,7 +240,27 @@ fun QrCodeScreen(
                 )
             }
         }
+
+        IconButton(
+            onClick = onToggleFlash,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(15.dp)
+                .background(
+                    color = Color.White.copy(alpha = 0.5f),
+                    shape = CircleShape
+                )
+        ) {
+            Icon(
+                imageVector = if (qrCodeUIState.flashEnabled) Icons.Default.FlashOn
+                else Icons.Default.FlashOff,
+                contentDescription = "Flash On/Off",
+                tint = Color.Black
+            )
+        }
+
         if (qrCodeUIState.detectedQrCode.isNotEmpty()) {
+            Log.d("QRCodeScreen", qrCodeUIState.detectedQrCode)
             val isUrl = qrCodeUIState.detectedQrCode.startsWith("http://") ||
                     qrCodeUIState.detectedQrCode.startsWith("https://")
             Text(
@@ -239,7 +277,7 @@ fun QrCodeScreen(
                         vertical = 8.dp
                     )
                     .clickable {
-                        if(isUrl){
+                        if (isUrl) {
                             val intent = Intent(
                                 Intent.ACTION_VIEW,
                                 Uri.parse(
@@ -249,7 +287,7 @@ fun QrCodeScreen(
                             context.startActivity(Intent.createChooser(intent, "Open with"))
                         }
                     },
-                color = if(isUrl) Color.Blue.copy(alpha = 0.5f) else Color.Black
+                color = if (isUrl) Color.Blue.copy(alpha = 0.5f) else Color.Black
             )
         }
     }
