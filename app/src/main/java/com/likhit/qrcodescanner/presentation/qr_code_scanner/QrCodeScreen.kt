@@ -17,17 +17,30 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.OpenInBrowser
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,17 +54,23 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.ClipboardManager
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -154,6 +173,9 @@ fun QrCodeScreenRoot(
         camera?.cameraControl?.enableTorch(qrCodeUIState.flashEnabled)
     }
 
+    val focusManager = LocalFocusManager.current
+    val clipboardManager = LocalClipboardManager.current
+
     CameraPermission(
         deniedContent = { status ->
             CameraPermissionScreen(
@@ -165,6 +187,8 @@ fun QrCodeScreenRoot(
             Scaffold { paddingValues ->
                 QrCodeScreen(
                     modifier = modifier.padding(paddingValues),
+                    focusManager = focusManager,
+                    clipboardManager = clipboardManager,
                     qrCodeUIState = qrCodeUIState,
                     previewView = previewView,
                     onTargetPositioned = viewModel::onTargetPositioned,
@@ -178,6 +202,8 @@ fun QrCodeScreenRoot(
 @Composable
 fun QrCodeScreen(
     modifier: Modifier = Modifier,
+    focusManager: FocusManager,
+    clipboardManager: ClipboardManager,
     previewView: PreviewView,
     qrCodeUIState: QrCodeUIState,
     onTargetPositioned: (Rect) -> Unit,
@@ -205,7 +231,14 @@ fun QrCodeScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.5f)),
+                .background(Color.Black.copy(alpha = 0.5f))
+                .pointerInput(Unit){
+                    detectTapGestures(
+                        onTap = {
+                            focusManager.clearFocus()
+                        }
+                    )
+                },
             contentAlignment = Alignment.Center
         ) {
             Canvas(
@@ -263,32 +296,135 @@ fun QrCodeScreen(
             Log.d("QRCodeScreen", qrCodeUIState.detectedQrCode)
             val isUrl = qrCodeUIState.detectedQrCode.startsWith("http://") ||
                     qrCodeUIState.detectedQrCode.startsWith("https://")
-            Text(
-                text = qrCodeUIState.detectedQrCode,
+            Column(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 24.dp)
-                    .background(
-                        color = Color.White.copy(alpha = 0.6f),
-                        shape = RoundedCornerShape(15.dp)
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.Bottom,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                SelectionContainer {
+                    Text(
+                        text = qrCodeUIState.detectedQrCode,
+                        modifier = Modifier
+                            .padding(bottom = 8.dp)
+                            .background(
+                                color = Color.White.copy(alpha = 0.6f),
+                                shape = RoundedCornerShape(15.dp)
+                            )
+                            .padding(
+                                horizontal = 16.dp,
+                                vertical = 8.dp
+                            )
+                            .clickable {
+                                if (isUrl) {
+                                    val intent = Intent(
+                                        Intent.ACTION_VIEW,
+                                        Uri.parse(
+                                            qrCodeUIState.detectedQrCode
+                                        )
+                                    )
+                                    context.startActivity(Intent.createChooser(intent, "Open with"))
+                                }
+                            },
+                        color = if (isUrl) Color.Blue.copy(alpha = 0.5f) else Color.Black
                     )
-                    .padding(
-                        horizontal = 16.dp,
-                        vertical = 8.dp
-                    )
-                    .clickable {
-                        if (isUrl) {
-                            val intent = Intent(
-                                Intent.ACTION_VIEW,
-                                Uri.parse(
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Start
+                ) {
+                    if(isUrl){
+                        IconButton(
+                            onClick = {
+                                val intent = Intent(
+                                    Intent.ACTION_VIEW,
+                                    Uri.parse(
+                                        qrCodeUIState.detectedQrCode
+                                    )
+                                )
+                                context.startActivity(Intent.createChooser(intent, "Open with"))
+                            },
+                            modifier = Modifier.size(50.dp),
+                            colors = IconButtonDefaults.iconButtonColors(
+                                contentColor = Color.White.copy(0.6f)
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.OpenInBrowser,
+                                contentDescription = "Open Link",
+                                modifier = Modifier.size(40.dp)
+                            )
+                        }
+                    }else{
+                        IconButton(
+                            onClick = {
+                                val searchIntent = Intent(
+                                    Intent.ACTION_VIEW,
+                                    Uri.parse(
+                                        "https://www.google.com/search?q=" +
+                                                Uri.encode(qrCodeUIState.detectedQrCode)
+                                    )
+                                )
+                                context.startActivity(searchIntent)
+                            },
+                            modifier = Modifier.size(50.dp),
+                            colors = IconButtonDefaults.iconButtonColors(
+                                contentColor = Color.White.copy(0.6f)
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Web search",
+                                modifier = Modifier.size(40.dp)
+                            )
+                        }
+                    }
+                    IconButton(
+                        onClick = {
+                            val sendIntent = Intent().apply {
+                                action = Intent.ACTION_SEND
+                                putExtra(
+                                    Intent.EXTRA_TEXT,
                                     qrCodeUIState.detectedQrCode
                                 )
+                                type = "text/plain"
+                            }
+                            val shareIntent = Intent.createChooser(
+                                sendIntent,
+                                if(isUrl) "Sharing link" else "Sharing Text"
                             )
-                            context.startActivity(Intent.createChooser(intent, "Open with"))
-                        }
-                    },
-                color = if (isUrl) Color.Blue.copy(alpha = 0.5f) else Color.Black
-            )
+                            context.startActivity(shareIntent)
+                        },
+                        modifier = Modifier.size(50.dp),
+                        colors = IconButtonDefaults.iconButtonColors(
+                            contentColor = Color.White.copy(0.6f)
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = "Share",
+                            modifier = Modifier.size(40.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = {
+                            clipboardManager.setText(AnnotatedString(qrCodeUIState.detectedQrCode))
+                        },
+                        modifier = Modifier.size(50.dp),
+                        colors = IconButtonDefaults.iconButtonColors(
+                            contentColor = Color.White.copy(alpha = 0.6f)
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ContentCopy,
+                            contentDescription = "Copy",
+                            modifier = Modifier.size(40.dp)
+                        )
+                    }
+                }
+            }
         }
     }
 }
