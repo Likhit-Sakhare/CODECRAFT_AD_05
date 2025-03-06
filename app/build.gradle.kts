@@ -75,7 +75,7 @@ dependencies {
     implementation ("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.0")
 
     //Google ML Barcode Scanner Kit
-    implementation("com.google.mlkit:barcode-scanning:17.0.3")
+    implementation("com.google.mlkit:barcode-scanning:17.3.0")
 
     //Extended Icons
     implementation("androidx.compose.material:material-icons-extended:1.7.8")
