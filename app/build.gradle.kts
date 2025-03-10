@@ -87,7 +87,4 @@ dependencies {
 
     // Accompanist
     implementation ("com.google.accompanist:accompanist-permissions:0.28.0")
-
-    //Zxing
-    implementation("com.google.zxing:core:3.3.3")
 }
